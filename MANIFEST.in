@@ -1,0 +1,5 @@
+
+include README.md
+include LICENSE
+recursive-include src/poisson_solver *.py *.txt
+recursive-include tests *.py
