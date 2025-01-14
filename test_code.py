@@ -1,4 +1,5 @@
 import numpy as np
+from src.boundary.function import u_ex, f
 from src.problem.poisson_problem import PoissonProblem
 
 def generate_grid(Nx, Ny):
@@ -42,7 +43,10 @@ def apply_boundary_conditions(f, boundary_value=0):
 def validate_solution(Nx, Ny):
     X, Y = generate_grid(Nx - 1, Ny - 1)
     u_exact = np.sin(np.pi * X)**2 * np.sin(np.pi * Y)**2
-    f = 2 * np.pi**2 * (np.sin(np.pi * X)**2 * np.sin(np.pi * Y)**2)
+    f = -2 * np.pi**2 * (
+        np.cos(2 * np.pi * X) * np.sin(np.pi * Y)**2
+        + np.cos(2 * np.pi * Y) * np.sin(np.pi * X)**2
+    )
     f_bc = apply_boundary_conditions(f)
     u_numerical = possion_solver(Nx, Ny, f_bc)
     error = np.max(np.abs(u_exact - u_numerical))
@@ -51,12 +55,26 @@ def validate_solution(Nx, Ny):
 def convergence_plot():
     import matplotlib.pyplot as plt
     errors = []
-    hs = []
+    hs = []    
     for N in [10, 20, 40, 80]:
         h = 1 / (N - 1)
-        problem = PoissonProblem(N, N, grid_type="uniform", solver_type="direct", boundary_condition_type="dirichlet")
-        u_numerical, X, Y = problem.solve()
+        # f = -2 * np.pi**2 * (
+        #     np.cos(2 * np.pi * X) * np.sin(np.pi * Y)**2
+        #     + np.cos(2 * np.pi * Y) * np.sin(np.pi * X)**2
+        # )
+        problem = PoissonProblem(
+                    Nx=N,
+                    Ny=N,
+                    f=f,
+                    u_ex=u_ex,
+                    grid_type="uniform",
+                    solver_type="direct", 
+                    boundary_condition_type="dirichlet")     
+        X, Y = generate_grid(N - 1, N - 1)
         u_exact = np.sin(np.pi * X)**2 * np.sin(np.pi * Y)**2
+        
+        # f_bc = apply_boundary_conditions(f)
+        u_numerical = problem.solve()   
         error = np.max(np.abs(u_exact - u_numerical))
         errors.append(error)
         hs.append(h)
