@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+cpp/build/
 develop-eggs/
 dist/
 downloads/
@@ -162,9 +163,9 @@ cython_debug/
 #.idea/
 
 # picture:
-*.jpg
+# *.jpg
 *.jpeg
-*.png
+# *.png
 
 
 # file

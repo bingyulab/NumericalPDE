@@ -25,13 +25,27 @@ class DirichletBoundaryCondition(BoundaryCondition):
         return f_bc
 
 class NeumannBoundaryCondition(BoundaryCondition):
-    def __init__(self, boundary_value=0):
-        self.boundary_value = boundary_value
+    def __init__(self, boundary_value=0, h=1.0):
+        self.boundary_value = boundary_value  # Derivative value at the boundary
+        self.h = h  # Grid spacing
 
-    def apply(self, f):
-        f_bc = f.copy()
-        f_bc[0, :] = f_bc[1, :] + self.boundary_value
-        f_bc[-1, :] = f_bc[-2, :] + self.boundary_value
-        f_bc[:, 0] = f_bc[:, 1] + self.boundary_value
-        f_bc[:, -1] = f_bc[:, -2] + self.boundary_value
+    def apply(self, F, X=None, Y=None):
+        """Apply Neumann boundary conditions using the finite difference approximation for the derivative"""
+        f_bc = F.copy()
+        if X is not None and Y is not None:
+            # Apply Neumann boundary condition using finite difference approximation
+            # Bottom boundary (y=0): forward difference approximation for u'(0)
+            f_bc[0, :] = f_bc[1, :] + self.boundary_value * self.h  # Bottom boundary
+            # Top boundary (y=N-1): backward difference approximation for u'(N-1)
+            f_bc[-1, :] = f_bc[-2, :] - self.boundary_value * self.h  # Top boundary
+            # Left boundary (x=0): forward difference approximation for u'(0)
+            f_bc[:, 0] = f_bc[:, 1] + self.boundary_value * self.h  # Left boundary
+            # Right boundary (x=N-1): backward difference approximation for u'(N-1)
+            f_bc[:, -1] = f_bc[:, -2] - self.boundary_value * self.h  # Right boundary
+        else:
+            # Homogeneous Neumann boundary conditions (derivative = 0)
+            f_bc[0, :] = f_bc[1, :]  # Bottom boundary
+            f_bc[-1, :] = f_bc[-2, :]  # Top boundary
+            f_bc[:, 0] = f_bc[:, 1]  # Left boundary
+            f_bc[:, -1] = f_bc[:, -2]  # Right boundary
         return f_bc

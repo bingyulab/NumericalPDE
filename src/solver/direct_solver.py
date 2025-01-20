@@ -3,23 +3,23 @@ import numpy as np
 import logging
 from src.tools.sparse_matrix import SparseMatrix
 from scipy.fftpack import dst, idst
+import scipy.sparse.linalg as splin
+import scipy.sparse
+import scipy.linalg as lin
 
 
 class DirectSolver(Solver):
 
-    def solve(self, L, b):
-        logging.info("DirectSolver: Solving system")
-        if isinstance(L, SparseMatrix):
-            solution = splin.spsolve(L.matrix, b)
+    def solve(self, A, b):
+        logging.info("DirectSolver: Solving system")        
+        if scipy.sparse.issparse(A):
+            # Use sparse solver
+            u_int = splin.spsolve(A, b)
         else:
-            solution = np.linalg.solve(L, b)
-        
-        # Ensure the solution is reshaped correctly
-        if solution.ndim == 1:
-            # Assuming square grid for 2D Poisson
-            N = int(np.sqrt(len(solution)))
-            solution = solution.reshape((N, N))
-        return solution
+            u_int = lin.solve(A, b)
+            # Direct solvers typically don't have iterations
+            self.iterations = 0
+        return u_int
 
 
 class FastPoissonSolver(Solver):
@@ -29,10 +29,7 @@ class FastPoissonSolver(Solver):
         if isinstance(L, SparseMatrix):
             L = L.to_dense()
         N = int(np.sqrt(L.shape[0]))
-        # Removed the rank check to avoid SparseEfficiencyWarning and ValueError
-        # if np.linalg.matrix_rank(L) < N * N:
-        #     raise Exception("FastPoissonSolver encountered a singular matrix (rank < size).")
-
+        
         b = b.reshape((N, N))
         b_hat = dst(dst(b, type=1).T, type=1).T
         k = np.arange(1, N + 1)

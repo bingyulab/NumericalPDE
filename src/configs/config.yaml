@@ -3,7 +3,7 @@ solver:
   type: "conjugate_gradient"  # Options: direct, fst, lu, cholesky, low_rank, jacobi, conjugate_gradient, multigrid, graph, priority_queue
   preconditioner: "jacobi"    # Options: none, jacobi, incomplete_cholesky
   tolerance: 1e-8
-  max_iterations: 1000
+  max_iterations: 10000
 
 grid:
   type: "uniform"              # Options: uniform, non-uniform

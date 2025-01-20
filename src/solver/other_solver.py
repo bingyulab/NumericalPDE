@@ -19,7 +19,8 @@ class PriorityQueueSolver(Solver):
 
     def __init__(self, tol=1e-8, max_iter=1000):
         self.tol = tol
-        self.max_iter = max_iter
+        self.max_iter = max_iter        
+        self.iterations = 0
 
     def solve(self, L, b):
         logging.info("PriorityQueueSolver: Solving system")
@@ -49,6 +50,7 @@ class PriorityQueueSolver(Solver):
                     f"Matrix L has zero diagonal at index {i}")
             x_new = (b[i] - sum1 - sum2) / L[i, i]
             if np.abs(x_new - x[i]) > self.tol:
-                residuals.put((np.abs(x_new - x[i]), i))
+                residuals.put((np.abs(x_new - x[i]), i))                
+                self.iterations += 1
             x[i] = x_new
         return x

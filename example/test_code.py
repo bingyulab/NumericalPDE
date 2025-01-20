@@ -1,3 +1,7 @@
+import sys
+import os
+# Add the project root to the Python path to resolve 'src' module imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import numpy as np
 from src.boundary.function import u_ex, f
 from src.problem.poisson_problem import PoissonProblem
@@ -58,10 +62,6 @@ def convergence_plot():
     hs = []    
     for N in [10, 20, 40, 80]:
         h = 1 / (N - 1)
-        # f = -2 * np.pi**2 * (
-        #     np.cos(2 * np.pi * X) * np.sin(np.pi * Y)**2
-        #     + np.cos(2 * np.pi * Y) * np.sin(np.pi * X)**2
-        # )
         problem = PoissonProblem(
                     Nx=N,
                     Ny=N,
@@ -71,13 +71,15 @@ def convergence_plot():
                     solver_type="direct", 
                     boundary_condition_type="dirichlet")     
         X, Y = generate_grid(N - 1, N - 1)
-        u_exact = np.sin(np.pi * X)**2 * np.sin(np.pi * Y)**2
+        u_exact = u_ex(X, Y)
         
         # f_bc = apply_boundary_conditions(f)
         u_numerical = problem.solve()   
         error = np.max(np.abs(u_exact - u_numerical))
         errors.append(error)
         hs.append(h)
+    print(hs, errors)    
+    print([np.log(x) for x in hs], [np.log(x) for x in errors])
     plt.loglog(hs, errors, marker='o')
     plt.xlabel('Step size (h)')
     plt.ylabel('Error')

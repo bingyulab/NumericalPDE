@@ -1,18 +1,16 @@
 from src.solver.base_solver import Solver  # Changed import
 from abc import ABC, abstractmethod
 import numpy as np
-from scipy.sparse import isspmatrix
-from src.tools.singleton import SingletonMeta
-from src.tools.sparse_matrix import SparseMatrix
 import logging
+import scipy.sparse as sp
+from cpp.build import poisson_solvers
 
+class IterativeSolver(Solver, ABC):
 
-class IterativeSolver(Solver, ABC, metaclass=SingletonMeta):
-
-    def __init__(self, tol=1e-8, max_iter=1000, preconditioner=None):
-        self.tol = tol
+    def __init__(self, tol=1e-8, max_iter=1000):
+        self.tol = float(tol)  # Ensure tol is a float
         self.max_iter = max_iter
-        self.preconditioner = preconditioner
+        self.iterations = 0  # Initialize iterations
 
     @abstractmethod
     def solve(self, L, b):
@@ -21,151 +19,122 @@ class IterativeSolver(Solver, ABC, metaclass=SingletonMeta):
 
 class JacobiSolver(IterativeSolver):
 
-    def __init__(self, tol=1e-8, max_iter=1000, preconditioner=None):
-        super().__init__(tol, max_iter, preconditioner)
-
     def solve(self, L, b):
-        if self.preconditioner:
-            b = self.preconditioner.apply(L, b)
-        x = np.zeros_like(b)
-        if isspmatrix(L.matrix if isinstance(L, SparseMatrix) else L):
-            L_matrix = L.matrix.toarray() if isinstance(L, SparseMatrix) else L
-        else:
-            L_matrix = L
-        if isinstance(L, SparseMatrix):
-            D = L.diagonal(
-            )  # Use method from SparseMatrix to get the diagonal
-            L_dense = L.to_dense()
-            R = L_dense - np.diagflat(D)  # Convert to dense before subtraction
-        else:
-            D = np.diag(L_matrix)
-            R = L_matrix - np.diagflat(D)
-        for _ in range(self.max_iter):
-            # Modify dot product to handle SparseMatrix
-            if isinstance(L, SparseMatrix):
-                dot_R_x = L.dot(x) - D * x  # Equivalent to np.dot(R, x)
-            else:
-                dot_R_x = np.dot(R, x)
-            x_new = (b - dot_R_x) / D
+        logging.info("JacobiSolver: Solving system")
+        if sp.issparse(L):
+            L = L.toarray()
+        logging.debug(f"L: {L.shape}, {sp.issparse(L)}")
+        
+        D = np.diag(L)
+        R = L - np.diagflat(D)
+        x = np.zeros_like(b, dtype=float)
+
+        for i in range(self.max_iter):
+            x_new = (b - np.dot(R, x)) / D
             if np.linalg.norm(x_new - x, ord=np.inf) < self.tol:
-                break
+                self.iterations = i + 1
+                return x_new
             x = x_new
+        else:
+            self.iterations = self.max_iter
+
         return x
 
 
 class ConjugateGradientSolver(IterativeSolver):
 
-    def __init__(self, tol=1e-8, max_iter=1000, preconditioner=None):
-        super().__init__(tol, max_iter, preconditioner)
-
     def solve(self, L, b):
-        if self.preconditioner:
-            b = self.preconditioner.apply(L, b)
-        x = np.zeros_like(b, dtype=float)  # Initialize x as float
-        if isspmatrix(L.matrix if isinstance(L, SparseMatrix) else L):
-            L_matrix = L.matrix.toarray() if isinstance(L, SparseMatrix) else L
-        else:
-            L_matrix = L
+        if sp.issparse(L):
+            L = L.toarray()
 
-        # Modify residual computation to handle SparseMatrix
-        if isinstance(L, SparseMatrix):
-            r = b - L.dot(x)
-        else:
-            r = b - np.dot(L, x)
+        x = np.zeros_like(b, dtype=float)
+        r = b - L.dot(x)
+        p = r.copy()
+        rsold = np.dot(r, r)
 
-        p = r
-        rsold = np.dot(r.T, r)
-        iteration = 0  # Initialize iteration counter
-        for _ in range(self.max_iter):
-            # Modify dot product to handle SparseMatrix
-            if isinstance(L, SparseMatrix):
-                Ap = L.dot(p)
-            else:
-                Ap = np.dot(L, p)
-            alpha = rsold / np.dot(p, Ap)
+        for i in range(self.max_iter):
+            Ap = L.dot(p)
+            alpha = rsold / np.dot(p, Ap)  # Now both are scalars
             x += alpha * p
             r -= alpha * Ap
             rsnew = np.dot(r, r)
-            iteration += 1  # Increment iteration counter
-            logging.debug(
-                f"CG Iteration {iteration}: Residual = {np.sqrt(rsnew)}")
             if np.sqrt(rsnew) < self.tol:
-                logging.info(
-                    f"ConjugateGradientSolver converged after {iteration} iterations."
-                )
-                break
+                self.iterations = i + 1
+                return x
             p = r + (rsnew / rsold) * p
             rsold = rsnew
+
         else:
-            logging.warning(
-                f"ConjugateGradientSolver did not converge within max_iter={self.max_iter}."
-            )
-            raise Exception(
-                f"ConjugateGradientSolver did not converge within max_iter={self.max_iter}."
-            )
-        logging.debug(
-            f"ConjugateGradientSolver completed {iteration} iterations.")
+            self.iterations = self.max_iter
         return x
 
 
 class GaussSeidelSolver(IterativeSolver):
+
     def solve(self, L, b):
         logging.info("GaussSeidelSolver: Solving system")
-        # Convert matrix to dense if sparse
-        if isinstance(L, SparseMatrix):
-            L_matrix = L.to_dense()
-        else:
-            L_matrix = L
+        if sp.issparse(L):
+            L = L.toarray()
 
         n = len(b)
         x = np.zeros_like(b, dtype=float)
-        D = np.diag(L_matrix)
-        # Off-diagonal part
-        M = L_matrix - np.diagflat(D)
-        
-        residuals = []
-        for _ in range(self.max_iter):
+        D = np.diag(L)
+        M = L - np.diagflat(D)
+
+        for j in range(self.max_iter):
+            x_new = x.copy()
             for i in range(n):
-                sigma = 0
-                for j in range(n):
-                    if j != i:
-                        sigma += L_matrix[i, j] * x[j]
-                x[i] = (b[i] - sigma) / L_matrix[i, i]
-            # Save residual for plotting
-            r = np.linalg.norm(b - L_matrix.dot(x), ord=2)
-            residuals.append(r)
-            if r < self.tol:
-                break
+                sigma = np.dot(M[i, :], x_new)
+                x_new[i] = (b[i] - sigma) / D[i]
+            if np.linalg.norm(x_new - x, ord=np.inf) < self.tol:
+                self.iterations = j + 1
+                return x_new
+            x = x_new
+        else:
+            self.iterations = self.max_iter
         return x
 
+
 class SORSolver(IterativeSolver):
-    def __init__(self, omega=1.5, tol=1e-8, max_iter=1000, preconditioner=None):
-        super().__init__(tol, max_iter, preconditioner)
+    def __init__(self, omega=1.5, tol=1e-8, max_iter=1000):
+        super().__init__(tol, max_iter)
         self.omega = omega
 
     def solve(self, L, b):
-        logging.info("SORSolver: Solving system with ω=%f" % self.omega)
-        if isinstance(L, SparseMatrix):
-            L_matrix = L.to_dense()
-        else:
-            L_matrix = L
+        logging.info("SORSolver: Solving system")
+        if sp.issparse(L):
+            L = L.toarray()
 
         n = len(b)
         x = np.zeros_like(b, dtype=float)
-        # Diagonal
-        D = np.diag(L_matrix)
+        D = np.diag(L)
+        M = L - np.diagflat(D)
 
-        residuals = []
-        for _ in range(self.max_iter):
+        for j in range(self.max_iter):
+            x_new = x.copy()
             for i in range(n):
-                sigma = 0
-                for j in range(n):
-                    if j != i:
-                        sigma += L_matrix[i, j] * x[j]
-                x[i] += self.omega * (b[i] - sigma - L_matrix[i,i]*x[i]) / L_matrix[i,i]
-            # Track residual
-            r = np.linalg.norm(b - L_matrix.dot(x), ord=2)
-            residuals.append(r)
-            if r < self.tol:
-                break
+                sigma = np.dot(M[i, :], x_new)
+                x_new[i] = (1 - self.omega) * x[i] + (self.omega / D[i]) * (b[i] - sigma)
+            if np.linalg.norm(x_new - x, ord=np.inf) < self.tol:
+                self.iterations = j + 1
+                return x_new
+            x = x_new
+
+        else:
+            self.iterations = self.max_iter
         return x
+
+
+class CppJacobiSolver(Solver):
+
+    def solve(self, L, b):
+        logging.info("CppJacobiSolver: Solving system")
+        if sp.issparse(L):
+            L = L.toarray()
+        
+        logging.info(f"L: {L.shape}")
+        # Call the C++ solver and unpack solution and iterations
+        solution, iterations = poisson_solvers.JacobiSolver().solve(L, b)
+        # Convert the solution to a NumPy array
+        self.iterations = iterations  # Store the number of iterations
+        return np.array(solution)

@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 from src.tools.sparse_matrix import SparseMatrix
-from src.solver.other_solver import Solver
+from src.solver.base_solver import Solver  # Changed import to base_solver
 import logging
 
 
@@ -16,26 +16,22 @@ class GraphSolver(Solver):
         nx.set_node_attributes(G, pos, 'pos')
         nx.set_node_attributes(G, labels, 'label')
 
+        L_dense = L.to_dense().toarray() if isinstance(L, SparseMatrix) else L
+
         for i in range(N):
             for j in range(N):
                 if i > 0:
                     # Use absolute value to ensure non-negative weights
-                    weight = abs(L[i * N + j, (i - 1) * N + j]) if isinstance(
-                        L, SparseMatrix) else abs(L[i * N + j,
-                                                    (i - 1) * N + j])
+                    weight = abs(L_dense[i * N + j, (i - 1) * N + j])
                     G.add_edge((i, j), (i - 1, j), weight=weight)
                 if i < N - 1:
-                    weight = abs(L[i * N + j, (i + 1) * N + j]) if isinstance(
-                        L, SparseMatrix) else abs(L[i * N + j,
-                                                    (i + 1) * N + j])
+                    weight = abs(L_dense[i * N + j, (i + 1) * N + j])
                     G.add_edge((i, j), (i + 1, j), weight=weight)
                 if j > 0:
-                    weight = abs(L[i * N + j, i * N + j - 1]) if isinstance(
-                        L, SparseMatrix) else abs(L[i * N + j, i * N + j - 1])
+                    weight = abs(L_dense[i * N + j, i * N + j - 1])
                     G.add_edge((i, j), (i, j - 1), weight=weight)
                 if j < N - 1:
-                    weight = abs(L[i * N + j, i * N + j + 1]) if isinstance(
-                        L, SparseMatrix) else abs(L[i * N + j, i * N + j + 1])
+                    weight = abs(L_dense[i * N + j, i * N + j + 1])
                     G.add_edge((i, j), (i, j + 1), weight=weight)
 
         b_dict = {

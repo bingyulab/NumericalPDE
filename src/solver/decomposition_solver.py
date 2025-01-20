@@ -1,30 +1,29 @@
 import numpy as np
-from scipy.sparse.linalg import splu
-from scipy.linalg import cholesky, solve_triangular, svd, lu_factor, lu_solve
-from src.tools.sparse_matrix import SparseMatrix
 import logging
-from src.solver.base_solver import Solver  # Changed import
-
+from scipy.linalg import lu_factor, lu_solve, cholesky, solve_triangular  
+from src.solver.base_solver import Solver
+import scipy.sparse as sp
 
 class LUdecompositionSolver(Solver):
-
-    def solve(self, L, b):
+    
+    def solve(self, A, b):
         logging.info("LUdecompositionSolver: Solving system")
-        if isinstance(L, SparseMatrix):
+        if sp.issparse(A):
             # Use splu for sparse matrices
-            lu = splu(L.matrix)
+            lu = sp.linalg.splu(A)
             return lu.solve(b)
         else:
-            lu, piv = lu_factor(L)
+            lu, piv = lu_factor(A)
             return lu_solve((lu, piv), b)
 
 
 class CholeskySolver(Solver):
-
+    
+    
     def solve(self, L, b):
         logging.info("CholeskySolver: Solving system")
-        if isinstance(L, SparseMatrix):
-            L = L.to_dense()  # Ensure L is a NumPy array
+        if sp.issparse(L):
+            L = L.toarray()  # Ensure L is a NumPy array
 
         # Check for symmetry
         if not np.allclose(L, L.T, atol=1e-8):
@@ -55,13 +54,16 @@ class CholeskySolver(Solver):
 
 
 class LowRankApproximationSolver(Solver):
-
-    def solve(self, L, b, rank=10):
+    def __init__(self, rank=10):
+        self.rank = rank
+        
+    def solve(self, A, b):
         logging.info("LowRankApproximationSolver: Solving system")
-        if isinstance(L, SparseMatrix):
-            L = L.to_dense()  # Convert SparseMatrix to dense NumPy array
-
-        U, s, Vt = svd(L)
-        S = np.diag(s[:rank])
-        L_approx = U[:, :rank] @ S @ Vt[:rank, :]
-        return np.linalg.solve(L_approx, b)
+        U, S, Vt = sp.linalg.svds(A, k=self.rank)
+        # Step 1: Compute U^T b
+        U_T_b = U.T @ b  # Shape: (k,)
+        # Step 2: Multiply by S^-1 (element-wise)
+        S_inv_U_T_b = (1.0 / S) * U_T_b  # Shape: (k,)
+        # Step 3: Multiply by V to get the solution vector
+        u_int = Vt.T @ S_inv_U_T_b  # Shape: (m,)
+        return u_int
