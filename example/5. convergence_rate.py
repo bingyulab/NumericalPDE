@@ -117,7 +117,7 @@ def convergence_plot():
                errors_non_homogeneous,
                marker='o',
                label='Non-Homogeneous Dirichlet')
-    plt.loglog(hs_homogeneous, errors_homogeneous, marker='s', label='Homogeneous Dirichlet')
+    # plt.loglog(hs_homogeneous, errors_homogeneous, marker='s', label='Homogeneous Dirichlet')
     plt.xlabel('Step size (h)')
     plt.ylabel('Error')
     plt.title('Convergence Rate')

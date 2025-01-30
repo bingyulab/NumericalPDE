@@ -10,7 +10,9 @@
 
 ---
 
-### **📌 Numerical PDE Methods**  
+### **Numerical PDE Package**  
+
+**📌 Methods**
 ✅ **Finite Difference Method (FDM)**  
 ❌ **Finite Element Method (FEM)**  
 ❌ **Finite Volume Method (FVM)**  
@@ -26,9 +28,7 @@
 ✅ **Neumann Boundary Conditions**  
 ✅ **Regular Grids** | ❌ **Irregular Grids**  
 
----
-
-### **🛠 Solvers and Techniques**  
+**🛠 Solvers and Techniques**  
 **1️⃣ Direct Methods**  
 ✅ LU Decomposition  
 
@@ -36,8 +36,55 @@
 ✅ Jacobi | ✅ Gauss-Seidel | ✅ SOR | ❌ Multigrid  
 
 **3️⃣ Advanced Methods**  
+✅ PINN
 
 ---
+
+### **Main Metrics for Measuring a System**
+When evaluating the performance of a system, there are several key metrics:
+
+1. **Throughput**  
+   - Measures the number of tasks (requests, transactions, operations) a system can handle per unit of time.
+   - Example: A web server handling 10,000 requests per second.
+
+2. **Concurrency**  
+   - Measures how many tasks can be processed simultaneously.
+   - Related to multi-threading, async execution, and parallel processing.
+
+3. **Latency**  
+   - The time delay between input and output (e.g., request and response).
+   - Lower latency is often better.
+   - Example: Database query latency of 50ms.
+
+4. **Response Time**  
+   - The total time a system takes to respond to a request.
+   - Includes network delay, processing time, and queue time.
+
+
+### **Characteristics of Numerical Algorithms**
+Numerical algorithms solve mathematical problems using numerical approximations. Their characteristics include:
+
+1. **Accuracy**  
+   - How close the numerical solution is to the exact solution.
+
+2. **Stability**  
+   - A small error should not grow uncontrollably.
+
+3. **Convergence**  
+   - Whether the numerical solution approaches the true solution as the step size decreases.
+
+4. **Computational Complexity**  
+   - Measures the time and space required for computation.
+   - Example: Matrix inversion is \(O(n^3)\), while iterative solvers like Conjugate Gradient are more efficient. 
+   - **VC (Vapnik-Chervonenkis) dimension** dimension was historically used to measure the complexity of a hypothesis class in machine learning, which was useful in classical learning theory (e.g., SVMs, logistic regression) but is not practical for modern ML, especially deep learning. More refined theories like **Rademacher complexity**, **PAC-Bayes**, and **margin-based bounds** are now preferred for analyzing generalization.
+
+5. **Condition Number**  
+   - Sensitivity of the problem to small input changes.
+   - High condition number → small errors get amplified.
+
+6. **Numerical Stability**  
+   - How errors propagate in computations.
+   - Example: Gaussian elimination with pivoting is more stable.
 
 ### **🚀 Optimizations & Enhancements**  
 | **Category** | **Status** | **Plan** |
@@ -52,11 +99,27 @@
 
 ---
 
+### **Data Structures Have Less Impact on Numerical Algorithms**
+Unlike general algorithms where data structures play a key role in performance optimization (e.g., hash tables, trees, heaps), **numerical algorithms are mostly about mathematical optimization rather than data structure design**. The reasons are:
+
+1. **Focus on Matrix and Vector Operations**  
+   - Most numerical methods (e.g., PDE solvers, optimization algorithms) rely on linear algebra.
+   - Sparse matrices can reduce complexity, but data structures like trees or heaps are rarely used.
+
+2. **Computational Efficiency Over Storage Efficiency**  
+   - The bottleneck is often **floating-point operations**, not data lookup speed.
+
+3. **Parallelism and Vectorization Matter More**  
+   - Performance gains come from efficient **vectorized operations**, not fancy data structures.
+   - Example: Using BLAS/LAPACK or GPU acceleration(Cuda, C/C++helps).
+
+---
+
 ## 1. Designing the Solver
 
 ### 1.1 Generating the Grid
 
-To solve the 2D Poisson equation numerically, we first discretize the domain using a rectangular grid. Given $Nx$ and $Ny$ as the number of intervals in the x and y directions respectively, the total number of grid points including boundaries is $(Nx+1) \times (Ny+1)$.
+To solve the 2D Poisson equation numerically, we first discretize the domain using a rectangular grid. Given $Nx$ and $Ny$ as the number of intervals in the x and y directions respectively, the total number of grid points including boundaries is $(Nx-1) \times (Ny-1)$.
 
 **Grid Generation**:
 - Generate a grid of interior points (excluding boundaries) with dimensions $(Nx-1) \times (Ny-1)$.
@@ -73,9 +136,9 @@ x, y = np.meshgrid(xi, yi)
 
 - **Explanation**:
     - **Grid Spacing (`h`)**: Determines the distance between adjacent grid points. By setting $h = \frac{1}{n-1}$, we ensure a uniform grid over the domain $[0, 1]$.
-    - **Interior Points (`nx`)**: We exclude the boundary points to focus on the interior where the Poisson equation is solved. This results in $nx = n - 2$ interior points in each direction.
-    - **Generating Coordinates (`xi`, `yi`)**: `np.linspace` generates evenly spaced points between $h$ and $1 - h$, ensuring that boundary points at $0$ and $1$ are excluded.
-    - **Meshgrid (`x`, `y`)**: `np.meshgrid` creates 2D coordinate matrices from the 1D arrays `xi` and `yi`, facilitating vectorized computations for the grid points.
+    - **Interior Points (`n_x`)**: We exclude the boundary points to focus on the interior where the Poisson equation is solved. This results in $n_x = n - 2$ interior points in each direction or using $h = \frac{1}{n}$ results in $n_x = n - 1$ interior points in each direction. 
+    - **Generating Coordinates (`x_i`, `y_i`)**: `np.linspace` generates evenly spaced points between $h$ and $1 - h$, ensuring that boundary points at $0$ and $1$ are excluded.
+    - **Meshgrid (`x`, `y`)**: `np.meshgrid` creates 2D coordinate matrices from the 1D arrays `x_i` and `y_i`, facilitating vectorized computations for the grid points.
 
 - [ ] **adjust for arbitrary domain**
 
@@ -88,6 +151,7 @@ x, y = np.meshgrid(xi, yi)
 🔹 **Concept**:  
 - Replace **derivatives** with difference equations using **Taylor series expansions**.  
 - Typically used on **uniform grids**.  
+- Measure the difference, which is widely used, like in Graph Theory.
 
 🔹 **Example: 1D Second-Order Derivative Approximation**  
 $$
@@ -191,7 +255,7 @@ u_{1,2} \\
 u_{Nx-1, Ny-1}
 \end{bmatrix}
 $$
-which is `flatten` in python.
+which used `flatten()` to return a copy of the array collapsed into one dimension.
 
 - The discrete Laplacian operator $\Delta_h$ can be expressed using the Kronecker product:
 
@@ -232,7 +296,7 @@ def discretize_poisson(Nx, Ny, h):
             - $I_y \otimes T_x$ applies the finite difference operator in the x-direction across all y-indices.
             - $T_y \otimes I_x$ applies the finite difference operator in the y-direction across all x-indices.
         - **Combining Operators**: The sum $I_y \otimes T_x + T_y \otimes I_x$ effectively creates the 2D discrete Laplacian operator $\Delta_h$.
-        - **Resulting Matrix (`L`)**: Represents the system matrix $A$ in the linear system $A\mathbf{u} = \mathbf{f}$.
+        - **Resulting Matrix (`A`)**: Represents the system matrix $A$ in the linear system $A\mathbf{u} = \mathbf{f}$.
 
     - In a 1D tridiagonal matrix $T$ of size $Nx-1$, the offsets usually refer to:
         - The main diagonal at offset 0,
@@ -253,17 +317,52 @@ $$
 A\mathbf{u} = \mathbf{f} + \mathbf{b}
 $$
 
-where $\mathbf{b}$ accounts for the boundary conditions. Since the boundaries are zero, $\mathbf{b}$ remains zero. For non-zero boundary conditions, $\mathbf{b}$ is adjusted accordingly.
+where $\mathbf{b}$ accounts for the boundary conditions. Since the boundaries are zero, $\mathbf{b}$ remains zero. 
 
-For a non-homogeneous boundary $u = g(x,y)$:
-
-- Modify $A$ to enforce conditions.
-
-- Adjust $b$ to reflect the boundary constraints:
+- For Dirichlet boundary conditions:
 
 $$
-b' = b - A_{\text{boundary}} g.
+u(x, y) = g(x, y) \quad \text{on the boundary}
 $$
+
+Define a **vector \( b \)** that modifies the right-hand side of the equation to include boundary terms.
+
+For an **interior point \( (i, j) \)** near the boundary:
+- If a neighboring point is on the **boundary**, its value is known.
+- Instead of solving for that point, we **move it to the right-hand side**.
+
+    $$- u_{i+1,j} - u_{i-1,j} - u_{i,j+1} - u_{i,j-1} + 4u_{i,j} = h^2 f_{i,j}$$
+
+If \( u_{i+1,j} \) is on the boundary, replace it with \( g(x_{i+1}, y_j) \):
+
+$$- g_{i+1,j} - u_{i-1,j} - u_{i,j+1} - u_{i,j-1} + 4u_{i,j} = h^2 f_{i,j}$$
+
+Rearranging:
+
+$$- u_{i-1,j} - u_{i,j+1} - u_{i,j-1} + 4u_{i,j} = h^2 f_{i,j} + g_{i+1,j}$$
+
+Thus, the boundary condition contributes a term \( b \) to the system:
+
+$$
+A u = f + b
+$$
+
+where \( b \) contains terms from the **boundary values** of \( u \).
+
+
+Therefore, for a **nonzero boundary condition** \( g(x, y) \), we must modify \( b \):
+
+- If \( u(x, y) = g(x, y) \) on the boundary, we **modify the right-hand side** vector:
+
+$$
+b = h^2 f + \sum_{\text{boundary terms}} g
+$$
+
+- The effect of \( g \) appears only in the **boundary-adjacent rows** of $A$.
+
+- For **Neumann boundary conditions** (where \( \frac{\partial u}{\partial n} = h \)), we modify the finite difference stencil to include the derivative approximation.
+
+---
 
 ```python
 class DirichletBoundaryCondition(BoundaryCondition):
@@ -346,7 +445,7 @@ For second-order finite difference schemes, the error typically converges at $\m
 #### **Computational Time Considerations:**
 - As the number of grid points increases, the size of the system grows.
 - Iterative solvers (e.g., Jacobi, Gauss-Seidel) may take more iterations for convergence.
-- Direct methods (e.g., Gaussian elimination) scale poorly for large systems due to high computational cost.
+- Direct methods scale poorly for large systems due to high computational cost.
 
 ![Convergence Plot](./converge_plot.png)
 #### **Observations:**
@@ -548,6 +647,23 @@ A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1), format='csr')
 
 [^7]: Wikipedia: https://en.wikipedia.org/wiki/Sparse_matrix
 
+#### **Difference Between Compressed Sparse Row (CSR) and Compressed Sparse Column (CSC)**
+Both **CSR (Compressed Sparse Row)** and **CSC (Compressed Sparse Column)** are sparse matrix formats that efficiently store large, sparse matrices. The key differences:
+
+| Feature  | **CSR (Compressed Sparse Row)** | **CSC (Compressed Sparse Column)** |
+|----------|--------------------------------|----------------------------------|
+| **Storage Order** | Stores nonzero elements row-wise | Stores nonzero elements column-wise |
+| **Use Case** | Fast row slicing and row-based operations | Fast column slicing and column-based operations |
+| **Memory Layout** | More cache-friendly for row-wise access | More cache-friendly for column-wise access |
+| **Efficient Operations** | Matrix-vector multiplication (**A × v**) | Solving sparse linear systems (**A^T × v**) |
+| **Indexing** | Easier to extract sparse rows | Easier to extract sparse columns |
+
+**Choosing CSR vs. CSC**
+- **Use CSR when you need fast row-wise operations**, like matrix-vector products (`A @ v`).
+- **Use CSC for algorithms that access columns frequently**, like solving sparse linear systems (`sp.linalg.spsolve()` prefers CSC).  
+
+---
+
 ![combined_dense_solutions](combined_dense_solutions.png)
 ![combined_sparse_solutions](combined_sparse_solutions.png)
 ![](dense_vs_sparse_computation_time.png)
@@ -682,11 +798,7 @@ This reformulation allows us to construct different iterative schemes.
 ---
 ##### **1️⃣ Jacobi Method[^9]**
 
-The **Jacobi Method** is an iterative algorithm for solving a system of linear equations $Ax = b$, where $A$ is a square matrix. The method splits $A$ into its diagonal component $D$, and the remainder $R = A - D$. The iteration formula is:
-$$
-x^{(k+1)} = D^{-1}(b - Rx^{(k)})
-$$
-This updates all variables $x_i$ simultaneously using values from the previous iteration.
+The **Jacobi Method** is an iterative algorithm for solving a system of linear equations $Ax = b$, where $A$ is a square matrix. 
 
 🔹 **Pros & Cons**  
 ✅ **Easy to parallelize** (since updates don’t depend on each other)  
@@ -712,6 +824,7 @@ Or, writing explicitly for each element:
 $$
 x_i^{(k+1)} = \frac{1}{a_{ii}} \left( b_i - \sum_{j \neq i} a_{ij} x_j^{(k)} \right)
 $$
+This updates all variables $x_i$ simultaneously using values from the previous iteration.
 
 **Step 2: Interpretation**
 
@@ -806,7 +919,6 @@ The **Gauss-Seidel Method** is similar to the Jacobi Method but uses updated val
 ✅ Still relatively simple  
 ❌ Harder to parallelize (since updates depend on previously computed values)  
 
-###### **Steps**:
 
 **Step 1: Matrix Splitting**
 
@@ -929,17 +1041,26 @@ $$
 ✅ **Useful for large sparse systems**  
 ❌ Requires tuning **\( \omega \)** for optimal performance  
 
-**Optimal $\omega$**
+**Optimal $\omega$[^26]**
 
 - Theoretical optimal $\omega$ is problem-dependent.
 - For simple Poisson problems, an approximate formula is:
 
 $$
-\omega_{\text{opt}} \approx \frac{2}{1 + \sin(\pi / n)}
+\omega_{\text{opt}} \approx \frac{2}{1 + \sin(\pi / h)}
 $$
+
+- Or $\omega$ can be approximated by:
+
+$$
+\omega_{\text{opt}} \approx \frac{2}{1 + \sqrt{1 - \rho(B)^2}}
+$$
+
+where $\rho(B) = \max | \lambda_i|$ is the spectral radius.
 
 - If chosen well, SOR can be **much faster than Gauss-Seidel**.
 
+[^26]: Darian, Hossein Mahmoodi. “The optimal relaxation parameter for the SOR method applied to the Poisson equation on rectangular grids with different types of boundary conditions.” (2025).
 ---
 
 ###### **Pseudo Code**:
@@ -1272,17 +1393,35 @@ We verify the accuracy by expanding the terms using the Taylor series for each o
 ---
 #### **Implementation**:
 ```python
-import numpy as np
+def discretize_poisson_4th(self, h):
+    """Constructs the sparse matrix for the 2D Poisson equation with Dirichlet BCs using 4th-order accuracy"""
+    nx = self.Nx - 1  # Number of interior points in x direction
+    ny = self.Ny - 1  # Number of interior points in y direction
 
-def laplacian_4th_order(u, h):
-    """
-    Compute the fourth-order finite difference approximation of the Laplacian.
-    """
-    n = len(u)
-    lap = np.zeros(n)
-    for i in range(2, n - 2):
-        lap[i] = (-u[i - 2] + 16 * u[i - 1] - 30 * u[i] + 16 * u[i + 1] - u[i + 2]) / (12 * h**2)
-    return lap
+    # 1D Pentadiagonal matrix T for 4th-order scheme
+    diagonals = [
+        (-1/12) * np.ones(nx - 2),   # Lower second diagonal
+        (4/3) * np.ones(nx - 1),     # Lower first diagonal
+        (-5/2) * np.ones(nx),        # Main diagonal
+        (4/3) * np.ones(nx - 1),     # Upper first diagonal
+        (-1/12) * np.ones(nx - 2)    # Upper second diagonal
+    ]
+    offsets = [-2, -1, 0, 1, 2]
+    
+    T = sp.diags(diagonals, offsets, shape=(nx, nx)) / (h * h)
+
+    # Identity matrix
+    I = sp.identity(ny)
+
+    # 2D Laplacian using Kronecker product
+    A = sp.kron(I, T) + sp.kron(T, I)
+    
+    # Add alpha * I to the operator
+    A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1))
+
+    logging.debug(f"A:{sp.isspmatrix(A)}")
+    
+    return sp.csr_matrix(A) if self.use_sparse else A.toarray()
 ```
 
 ---
@@ -1441,7 +1580,6 @@ class ConjugateGradientSolver(IterativeSolver):
 
 [^16]: Wikipedia: https://en.wikipedia.org/wiki/Conjugate_gradient_method
 
-![](iterations_bar_chart.png)
 
 #### Summary of Methods
 | **Method**            | **Convergence Speed**      | **Advantages**                         | **Disadvantages**                   |
@@ -1464,12 +1602,6 @@ class ConjugateGradientSolver(IterativeSolver):
   \frac{u_{1} - u_{0}}{h} = g \quad \text{or} \quad \frac{u_{N} - u_{N-1}}{h} = g.
   $$
 
-
-#### **Validation**:
-1. Choose an exact solution $u_{\text{exact}}(x)$.
-2. Compute $f$ using the modified PDE.
-3. Solve the system and compare numerical results with $u_{\text{exact}}(x)$.
-4. Check convergence rate $O(h^2)$ using log-log plots.
 
 ---
 

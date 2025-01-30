@@ -77,7 +77,7 @@ def compare_solvers(solver_types, n_list):
                 grid_type="uniform",
                 solver_type=solver_name,
                 boundary_condition_type="dirichlet",
-                use_sparse=solver_name in ["lu", "low_rank", "direct"]  
+                use_sparse=solver_name in ["lu", "low_rank"]  
             )
             
             data = convergence_test(u_ex,
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     ns = [10, 20, 40, 80]
     # Compare all solvers and store results in df_all_solvers
     solver_types_to_compare = [
-        "jacobi", "gauss_seidel", "sor", "conjugate_gradient"
+        "gauss_seidel", "jacobi", "sor", "conjugate_gradient"
     ]
     df_all_solvers = compare_solvers(solver_types_to_compare, ns)
 

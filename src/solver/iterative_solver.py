@@ -5,6 +5,7 @@ import logging
 import scipy.sparse as sp
 from cpp.build import poisson_solvers
 
+
 class IterativeSolver(Solver, ABC):
 
     def __init__(self, tol=1e-8, max_iter=1000):
@@ -18,7 +19,6 @@ class IterativeSolver(Solver, ABC):
 
 
 class JacobiSolver(IterativeSolver):
-
     def solve(self, L, b):
         logging.info("JacobiSolver: Solving system")
         if sp.issparse(L):
@@ -44,33 +44,37 @@ class JacobiSolver(IterativeSolver):
 class ConjugateGradientSolver(IterativeSolver):
 
     def solve(self, L, b):
+        logging.info("ConjugateGradientSolver: Solving system")
+
         if sp.issparse(L):
-            L = L.toarray()
+            L = sp.csr_matrix(
+                L
+            )  # Keep it sparse in CSR format for fast matrix-vector multiplication
 
         x = np.zeros_like(b, dtype=float)
-        r = b - L.dot(x)
+        r = b - L @ x
         p = r.copy()
         rsold = np.dot(r, r)
 
         for i in range(self.max_iter):
-            Ap = L.dot(p)
-            alpha = rsold / np.dot(p, Ap)  # Now both are scalars
+            Ap = L @ p  # Sparse matrix-vector product (fast in CSR)
+            alpha = rsold / np.dot(p, Ap)
             x += alpha * p
             r -= alpha * Ap
             rsnew = np.dot(r, r)
-            if np.sqrt(rsnew) < self.tol:
+
+            if rsnew < self.tol**2:  # Avoids square root for efficiency
                 self.iterations = i + 1
                 return x
+
             p = r + (rsnew / rsold) * p
             rsold = rsnew
 
-        else:
-            self.iterations = self.max_iter
+        self.iterations = self.max_iter
         return x
 
 
 class GaussSeidelSolver(IterativeSolver):
-
     def solve(self, L, b):
         logging.info("GaussSeidelSolver: Solving system")
         if sp.issparse(L):
@@ -93,6 +97,7 @@ class GaussSeidelSolver(IterativeSolver):
         else:
             self.iterations = self.max_iter
         return x
+
 
 
 class SORSolver(IterativeSolver):
@@ -131,7 +136,7 @@ class CppJacobiSolver(Solver):
         logging.info("CppJacobiSolver: Solving system")
         if sp.issparse(L):
             L = L.toarray()
-        
+
         logging.info(f"L: {L.shape}")
         # Call the C++ solver and unpack solution and iterations
         solution, iterations = poisson_solvers.JacobiSolver().solve(L, b)

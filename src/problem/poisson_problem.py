@@ -71,11 +71,38 @@ class PoissonProblem:
         # Add alpha * I to the operator
         A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1))
         logging.debug(f"A:{sp.isspmatrix(A)}")
-        if self.use_sparse:
-            A = sp.csr_matrix(A)
-        else:
-            A = A.toarray()
-        return A
+            
+        return sp.csr_matrix(A) if self.use_sparse else A.toarray()
+
+    def discretize_poisson_4th(self, h):
+        """Constructs the sparse matrix for the 2D Poisson equation with Dirichlet BCs using 4th-order accuracy"""
+        nx = self.Nx - 1  # Number of interior points in x direction
+        ny = self.Ny - 1  # Number of interior points in y direction
+
+        # 1D Pentadiagonal matrix T for 4th-order scheme
+        diagonals = [
+            (-1/12) * np.ones(nx - 2),   # Lower second diagonal
+            (4/3) * np.ones(nx - 1),     # Lower first diagonal
+            (-5/2) * np.ones(nx),        # Main diagonal
+            (4/3) * np.ones(nx - 1),     # Upper first diagonal
+            (-1/12) * np.ones(nx - 2)    # Upper second diagonal
+        ]
+        offsets = [-2, -1, 0, 1, 2]
+        
+        T = sp.diags(diagonals, offsets, shape=(nx, nx)) / (h * h)
+
+        # Identity matrix
+        I = sp.identity(ny)
+
+        # 2D Laplacian using Kronecker product
+        A = sp.kron(I, T) + sp.kron(T, I)
+        
+        # Add alpha * I to the operator
+        A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1))
+
+        logging.debug(f"A:{sp.isspmatrix(A)}")
+        
+        return sp.csr_matrix(A) if self.use_sparse else A.toarray()
 
     def solve(self, mode='sequential'):
         logging.info("PoissonProblem: Solving problem")
