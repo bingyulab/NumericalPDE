@@ -10,7 +10,7 @@
 
 ---
 
-### **Numerical PDE Package**  
+### **Numerical PDE System**  
 
 **📌 Methods**
 ✅ **Finite Difference Method (FDM)**  
@@ -89,7 +89,7 @@ Numerical algorithms solve mathematical problems using numerical approximations.
 ### **🚀 Optimizations & Enhancements**  
 | **Category** | **Status** | **Plan** |
 |-------------|-----------|----------|
-| **Data Structures** | ✅ | |
+| **Data Structures** | ✅ Sparse Matrix| |
 | **Speed & Security** | ✅ (Jacobi in C++) | Extend to other solvers |
 | **CUDA Acceleration** | ❌ | Implement GPU-based solvers |
 | **Neural Networks** | ✅ PINN demo | Improve inference (ONNX, CUDA optimization) |
@@ -134,13 +134,7 @@ yi = np.linspace(h, 1 - h, nx)  # Interior points only
 x, y = np.meshgrid(xi, yi)
 ```
 
-- **Explanation**:
-    - **Grid Spacing (`h`)**: Determines the distance between adjacent grid points. By setting $h = \frac{1}{n-1}$, we ensure a uniform grid over the domain $[0, 1]$.
-    - **Interior Points (`n_x`)**: We exclude the boundary points to focus on the interior where the Poisson equation is solved. This results in $n_x = n - 2$ interior points in each direction or using $h = \frac{1}{n}$ results in $n_x = n - 1$ interior points in each direction. 
-    - **Generating Coordinates (`x_i`, `y_i`)**: `np.linspace` generates evenly spaced points between $h$ and $1 - h$, ensuring that boundary points at $0$ and $1$ are excluded.
-    - **Meshgrid (`x`, `y`)**: `np.meshgrid` creates 2D coordinate matrices from the 1D arrays `x_i` and `y_i`, facilitating vectorized computations for the grid points.
-
-- [ ] **adjust for arbitrary domain**
+- By setting $h = \frac{1}{n-1}$, we ensure a uniform grid over the domain $[0, 1]$. This results in $n_x = n - 2$ interior points in each direction or using $h = \frac{1}{n}$ results in $n_x = n - 1$ interior points in each direction. 
 
 ### 1.2 Approximation
 
@@ -242,20 +236,6 @@ where **$\mathbf{F}$** represents flux terms.
 ### 1.3 Matrix Formulation
 
 **Matrix Representation of the Discrete Poisson Equation**:
-- Arrange the unknowns $u_{i,j}$ into a global vector $\mathbf{u}$ using column-wise ordering:
-
-$$
-\mathbf{u} = \begin{bmatrix}
-u_{1,1} \\
-u_{2,1} \\
-\vdots \\
-u_{Nx-1,1} \\
-u_{1,2} \\
-\vdots \\
-u_{Nx-1, Ny-1}
-\end{bmatrix}
-$$
-which used `flatten()` to return a copy of the array collapsed into one dimension.
 
 - The discrete Laplacian operator $\Delta_h$ can be expressed using the Kronecker product:
 
@@ -286,22 +266,6 @@ def discretize_poisson(Nx, Ny, h):
     return L
 ```
 
-- **Explanation**:
-    - **Finite Difference Matrix (`finite_difference`)**:
-        - **Diagonal Entries**: The main diagonal is filled with $-2/h^2$, representing the central coefficient in the finite difference approximation.
-        - **Off-Diagonals**: The subdiagonal and superdiagonal are filled with $1/h^2$, representing the coefficients for $u_{i-1,j}$ and $u_{i+1,j}$ respectively.
-        - This creates a tridiagonal matrix $T$ which models the second-order derivative in one dimension.
-    - **Discretizing Poisson Equation (`discretize_poisson`)**:
-        - **Kronecker Products**: 
-            - $I_y \otimes T_x$ applies the finite difference operator in the x-direction across all y-indices.
-            - $T_y \otimes I_x$ applies the finite difference operator in the y-direction across all x-indices.
-        - **Combining Operators**: The sum $I_y \otimes T_x + T_y \otimes I_x$ effectively creates the 2D discrete Laplacian operator $\Delta_h$.
-        - **Resulting Matrix (`A`)**: Represents the system matrix $A$ in the linear system $A\mathbf{u} = \mathbf{f}$.
-
-    - In a 1D tridiagonal matrix $T$ of size $Nx-1$, the offsets usually refer to:
-        - The main diagonal at offset 0,
-        - The subdiagonal at offset -1,
-        - The superdiagonal at offset +1.
 - The linear system becomes:
 
 $$
@@ -311,13 +275,6 @@ $$
 where $A = \Delta_h$ and $\mathbf{f} = \text{RHS}$.
 
 **Incorporating Boundary Conditions**:
-- For homogeneous Dirichlet boundary conditions ($u = 0$ on $\partial\Omega$):
-
-$$
-A\mathbf{u} = \mathbf{f} + \mathbf{b}
-$$
-
-where $\mathbf{b}$ accounts for the boundary conditions. Since the boundaries are zero, $\mathbf{b}$ remains zero. 
 
 - For Dirichlet boundary conditions:
 
@@ -360,7 +317,21 @@ $$
 
 - The effect of \( g \) appears only in the **boundary-adjacent rows** of $A$.
 
-- For **Neumann boundary conditions** (where \( \frac{\partial u}{\partial n} = h \)), we modify the finite difference stencil to include the derivative approximation.
+
+- Arrange the unknowns $u_{i,j}$ into a global vector $\mathbf{u}$ using column-wise ordering:
+
+$$
+\mathbf{u} = \begin{bmatrix}
+u_{1,1} \\
+u_{2,1} \\
+\vdots \\
+u_{Nx-1,1} \\
+u_{1,2} \\
+\vdots \\
+u_{Nx-1, Ny-1}
+\end{bmatrix}
+$$
+which used `flatten()` to return a copy of the array collapsed into one dimension.
 
 ---
 
@@ -384,23 +355,6 @@ class DirichletBoundaryCondition(BoundaryCondition):
             f_bc[:, -1] = 0  # Right boundary
         return f_bc
 ```
-
-- **Explanation**:
-    - **Abstract Base Class (`BoundaryCondition`)**:
-        - Using an abstract base class allows for defining a common interface for different types of boundary conditions (e.g., Dirichlet, Neumann).
-        - This promotes code reusability and flexibility, enabling easy extension for additional boundary conditions in the future.
-    - **OOP Approach**:
-        - Encapsulates boundary condition logic within classes, making the codebase organized and modular.
-        - Facilitates maintenance and scalability, as each boundary condition type can be managed independently.
-    - **`DirichletBoundaryCondition` Class**:
-        - **Constructor (`__init__`)**: Accepts an optional boundary function `g` which defines non-homogeneous boundary conditions.
-        - **`apply` Method**:
-            - Copies the existing right-hand side vector `F`.
-            - If a boundary function `g` is provided along with grid coordinates `X` and `Y`, it applies the non-homogeneous boundary conditions by evaluating `g` at the boundary points.
-            - If no boundary function is provided, it defaults to homogeneous Dirichlet conditions by setting boundary values to zero.
-        - **Benefits**:
-            - **Flexibility**: Can handle both homogeneous and non-homogeneous Dirichlet boundary conditions based on user input.
-            - **Modularity**: Boundary condition application logic is separated from the core solver logic, adhering to the single responsibility principle.
 
 ---
 
@@ -624,41 +578,14 @@ A = sp.kron(I, T) + sp.kron(T, I)
 A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1), format='csr')
 ```
 
-#### **Explanation**:
-- **Creating Tridiagonal Matrix (`T`)**:
-    - **Diagonal Arrays**:
-        - **Lower Diagonal**: $-1$ for all sub-diagonal entries.
-        - **Main Diagonal**: $2$ for all diagonal entries.
-        - **Upper Diagonal**: $-1$ for all super-diagonal entries.
-    - **Offsets**: $[-1, 0, 1]$ correspond to the positions of the lower diagonal, main diagonal, and upper diagonal respectively.
-    - **`sp.diags` Function**:
-        - Constructs a sparse diagonal matrix from the provided diagonals and their corresponding offsets.
-        - The matrix is divided by $h^2$ to account for the finite difference scaling.
-        - **Sparse Format (`csr`)**: Compressed Sparse Row format allows efficient arithmetic operations and matrix-vector products.
-- **Identity Matrix (`I`)**:
-    - Creates a sparse identity matrix of size $Ny$ in CSR format.
-- **2D Laplacian (`A`)**:
-    - **Kronecker Products (`sp.kron`)**:
-        - $I \otimes T$: Applies the tridiagonal operator $T$ across all y-indices.
-        - $T \otimes I$: Applies the tridiagonal operator $T$ across all x-indices.
-    - **Summation**: $A = I \otimes T + T \otimes I$ forms the 2D Laplacian operator by combining x and y directional differences.
 - **Adding Diffusion Term**:
     - $A += \alpha I$: Incorporates the diffusion term $\alpha u$ into the system matrix, maintaining the symmetric positive definite (SPD) property provided $\alpha \geq 0$.
 
 [^7]: Wikipedia: https://en.wikipedia.org/wiki/Sparse_matrix
 
 #### **Difference Between Compressed Sparse Row (CSR) and Compressed Sparse Column (CSC)**
-Both **CSR (Compressed Sparse Row)** and **CSC (Compressed Sparse Column)** are sparse matrix formats that efficiently store large, sparse matrices. The key differences:
+Both **CSR (Compressed Sparse Row)** and **CSC (Compressed Sparse Column)** are sparse matrix formats that efficiently store large, sparse matrices. 
 
-| Feature  | **CSR (Compressed Sparse Row)** | **CSC (Compressed Sparse Column)** |
-|----------|--------------------------------|----------------------------------|
-| **Storage Order** | Stores nonzero elements row-wise | Stores nonzero elements column-wise |
-| **Use Case** | Fast row slicing and row-based operations | Fast column slicing and column-based operations |
-| **Memory Layout** | More cache-friendly for row-wise access | More cache-friendly for column-wise access |
-| **Efficient Operations** | Matrix-vector multiplication (**A × v**) | Solving sparse linear systems (**A^T × v**) |
-| **Indexing** | Easier to extract sparse rows | Easier to extract sparse columns |
-
-**Choosing CSR vs. CSC**
 - **Use CSR when you need fast row-wise operations**, like matrix-vector products (`A @ v`).
 - **Use CSC for algorithms that access columns frequently**, like solving sparse linear systems (`sp.linalg.spsolve()` prefers CSC).  
 
@@ -895,20 +822,7 @@ class JacobiSolver(IterativeSolver):
 
         return x
 ```
-
-###### **Explanation**:
-- **Initialization**:
-    - **Diagonal Matrix (`D`)**: Extracts the diagonal elements of $L$ which correspond to $A_{ii}$.
-    - **Residual Matrix (`R`)**: Represents $L$ with the diagonal removed, used to compute the residual $b - R x$.
-    - **Initial Guess (`x`)**: Starts with a zero vector.
-- **Iterative Update**:
-    - **Compute New $x$**: Updates each component of $x$ based on the previous iteration values.
-    - **Convergence Check**: Uses the infinity norm to determine if the solution has converged within the specified tolerance.
-    - **Iteration Count**: Tracks the number of iterations taken to converge.
-- **Termination**:
-    - Returns the updated solution if convergence is achieved.
-    - If the maximum number of iterations is reached without convergence, returns the last computed solution.
-
+---
 
 ##### **2️⃣ Gauss-Seidel Method[^10]**:
 The **Gauss-Seidel Method** is similar to the Jacobi Method but uses updated values as soon as they are computed. This usually leads to faster convergence.
@@ -1008,22 +922,6 @@ class GaussSeidelSolver(IterativeSolver):
         return x
 ```
 
-###### **Explanation**:
-- **Initialization**:
-    - **Diagonal Matrix (`D`)**: Extracts the diagonal elements of $L$ corresponding to $A_{ii}$.
-    - **Residual Matrix (`M`)**: Represents $L$ with the diagonal removed.
-    - **Initial Guess (`x`)**: Starts with a zero vector.
-- **Iterative Update**:
-    - **Row-wise Update**: Iterates through each component of $x$, updating it based on the latest available values.
-    - **Residual Calculation (`sigma`)**: Computes the sum of $A_{ij} x_j$ for $j \neq i$.
-    - **Update Rule**: Updates $x_i$ using the residual and the current diagonal element.
-    - **Convergence Check**: Uses the infinity norm to determine if the solution has converged within the specified tolerance.
-    - **Iteration Count**: Tracks the number of iterations taken to converge.
-- **Termination**:
-    - Returns the updated solution if convergence is achieved.
-    - If the maximum number of iterations is reached without convergence, returns the last computed solution.
-
-
 ---
 
 ##### **3️⃣ Successive Over-Relaxation (SOR)[^11]**:
@@ -1114,23 +1012,6 @@ class SORSolver(IterativeSolver):
             self.iterations = self.max_iter
         return x
 ```
-
-###### **Explanation**:
-- **Initialization**:
-    - **Relaxation Factor (`omega`)**: Determines the influence of the new update on the existing solution. Values between 1 and 2 can accelerate convergence.
-    - **Diagonal Matrix (`D`)**: Extracts the diagonal elements of $L$ corresponding to $A_{ii}$.
-    - **Residual Matrix (`M`)**: Represents $L$ with the diagonal removed.
-    - **Initial Guess (`x`)**: Starts with a zero vector.
-- **Iterative Update**:
-    - **Row-wise Update with Relaxation**: Iterates through each component of $x$, updating it based on the residual and the relaxation factor.
-    - **Residual Calculation (`sigma`)**: Computes the sum of $A_{ij} x_j$ for $j \neq i$.
-    - **Update Rule**: Combines the old value and the new computed value using the relaxation factor $\omega$.
-    - **Convergence Check**: Uses the infinity norm to determine if the solution has converged within the specified tolerance.
-    - **Iteration Count**: Tracks the number of iterations taken to converge.
-- **Termination**:
-    - Returns the updated solution if convergence is achieved.
-    - If the maximum number of iterations is reached without convergence, returns the last computed solution.
-
 ---
 
 ##### **💡 Comparison of Jacobi, Gauss-Seidel, and SOR**
@@ -1225,13 +1106,6 @@ plt.show()
 
 ---
 
-##### **Conclusion on Performance**:
-- **SOR** converges faster with a properly chosen $\omega$ compared to Jacobi and Gauss-Seidel.
-- **Jacobi** is slowest due to weaker coupling between variables.
-- **Gauss-Seidel** is faster than Jacobi due to sequential updates.
-- **Computational Time**: SOR achieves better convergence but requires careful tuning of $\omega$.
-
-
 ### OOP[^12] with **Factory Pattern and Singleton Pattern**
 
 #### **Factory Pattern[^13]**
@@ -1246,12 +1120,6 @@ plt.show()
 - **Why Use It**:
   - **Resource Management**: Useful when exactly one object is needed to coordinate actions (e.g., a configuration manager or logging system).
   - **Global Access**: Provides a single instance that can be accessed across the application.
-
-#### **Comparison**:
-| **Aspect**       | **Factory Pattern**                          | **Singleton Pattern**                     |
-|-------------------|---------------------------------------------|------------------------------------------|
-| **Purpose**       | Creates multiple objects with varying types | Ensures only one instance of a class     |
-| **Use Case**      | Object creation with flexibility            | Global state or resource management      |
 
 
 [^12]: Wikipedia: https://en.wikipedia.org/wiki/Object-oriented_programming
@@ -1320,11 +1188,6 @@ where $\alpha$ is a real parameter. This introduces a **reaction term** into the
 
 When solving partial differential equations (PDEs) like $-\Delta u + \alpha u = f$, the **discretization** of the domain (e.g., using finite difference or finite element methods) transforms the continuous problem into a finite-dimensional approximation. 
 
-- $-\Delta u$ (the Laplacian term) is approximated using numerical schemes (e.g., second-order central difference).
-- The function $u$ at grid points becomes a vector $\mathbf{u}$.
-- The right-hand side $f$ becomes a vector $\mathbf{f}$.
-- The discretized Laplacian leads to a system matrix $A_{\Delta}$.
-- The term $\alpha u$ introduces a diagonal term to the system matrix.
 - The resulting linear system is:
 $$
 A \mathbf{u} = \mathbf{f},
@@ -1378,8 +1241,6 @@ $$
 $$
 u_{i-2} = u_i - 2h u'_i + 2h^2 u''_i - \frac{8h^3}{6} u'''_i + \frac{16h^4}{24} u^{(4)}_i + \mathcal{O}(h^5).
 $$
-
-Now, we aim to combine these approximations with coefficients that eliminate the odd-order terms (like $u'_i$, $u'''_i$) and optimize the coefficients for the even-order terms (like $u_i$, $u''_i$) to achieve fourth-order accuracy.
 
 By using the Taylor expansions above, we aim to construct a linear combination of $u_{i-2}, u_{i-1}, u_i, u_{i+1}, u_{i+2}$ that eliminates the odd-order terms, and leads to a second derivative approximation with fourth-order accuracy. We set the following weighted sum:
 
@@ -1560,34 +1421,8 @@ class ConjugateGradientSolver(IterativeSolver):
         return x
 ```
 
-###### **Explanation**:
-- **Initialization**:
-    - **Initial Guess (`x`)**: Starts with a zero vector.
-    - **Residual (`r`)**: Initialized as $b - L x$, representing the initial error.
-    - **Search Direction (`p`)**: Starts as the residual $r_0$.
-    - **Residual Norm (`rsold`)**: Stores $r_0^T r_0$ for computing coefficients.
-- **Iterative Update**:
-    - **Compute $Ap$**: Matrix-vector product $A p_k$.
-    - **Compute Step Size (`alpha`)**: Determines how far to move along the search direction.
-    - **Update Solution (`x`)**: Moves to the new point $x_{k+1}$.
-    - **Update Residual (`r`)**: Computes the new residual $r_{k+1}$.
-    - **Check for Convergence**: If the residual norm is below the tolerance, the method has converged.
-    - **Compute New Search Direction (`p`)**: Combines the new residual with the previous search direction to form a conjugate direction.
-    - **Update Residual Norm (`rsold`)**: Prepares for the next iteration.
-- **Termination**:
-    - Returns the updated solution if convergence is achieved.
-    - If the maximum number of iterations is reached without convergence, returns the last computed solution.
-
 [^16]: Wikipedia: https://en.wikipedia.org/wiki/Conjugate_gradient_method
 
-
-#### Summary of Methods
-| **Method**            | **Convergence Speed**      | **Advantages**                         | **Disadvantages**                   |
-|------------------------|----------------------------|-----------------------------------------|-------------------------------------|
-| **Jacobi**             | Slow                      | Easy to implement                      | Requires more iterations            |
-| **Gauss-Seidel**       | Faster than Jacobi        | Faster convergence than Jacobi         | Still slow for large systems        |
-| **SOR**                | Adjustable with $\omega$ | Can accelerate convergence            | Requires optimal $\omega$       |
-| **Conjugate Gradient** | Fastest for SPD matrices  | Best for large sparse SPD systems      | Limited to SPD matrices             |
 ---
 
 ### 3.4 Implementing Non-Homogeneous Boundary Conditions
@@ -1918,34 +1753,6 @@ Multithreading is a form of parallel execution **within a single process**, wher
 
 ---
 
-#### **3. How They Work Together**
-✅ **Multithreading on a Single-Core CPU:**  
-- Threads take turns running (context switching).  
-- No true parallelism, just improved responsiveness.  
-
-✅ **Multithreading on a Multi-Core CPU:**  
-- Different threads can run on different cores simultaneously.  
-- True parallel execution improves performance.  
-
-✅ **Parallel Programming on Multi-Core CPUs or Multi-Processors:**  
-- Each processor/core executes separate processes or threads, significantly improving computational efficiency.  
-
-✅ **Parallel Programming on GPUs (e.g., CUDA):**  
-- Thousands of lightweight threads run in parallel.  
-- Ideal for matrix operations, PDE solvers, deep learning, etc.  
-
----
-
-### **4. Summary Table**
-| Feature         | Single-core CPU | Multi-core CPU | Multi-Processor | GPU Parallelism |
-|---------------|----------------|---------------|---------------|---------------|
-| **Parallel Execution** | ❌ (time-sharing only) | ✅ | ✅ | ✅ |
-| **Multithreading** | Simulated (context switching) | ✅ (threads on different cores) | ✅ (across processors) | ✅ (massively parallel) |
-| **Performance Boost** | 🚫 Minimal | ✅ Moderate | ✅ High | ✅✅ Very High |
-| **Ideal For** | Basic applications | Medium parallelism (scientific computing) | High-performance computing | Large-scale computations (e.g., deep learning, physics simulations) |
-
----
-
 
 ![](parallel_multithreaded_speed_comparison.png)
 
@@ -1996,10 +1803,7 @@ Multithreading is a form of parallel execution **within a single process**, wher
 
 ---
 
-#### **2. Why Is Python Multithreading Sometimes Slow?**
-Python multithreading can be **slower** due to the **Global Interpreter Lock (GIL)**.
-
-#### **(1) What Is the GIL?**
+#### **2. What Is the GIL?**
 - The **GIL (Global Interpreter Lock)**[^20] ensures that only **one thread** executes Python bytecode at a time.
 - This means that **even on a multi-core CPU, Python threads cannot run in parallel** for CPU-bound tasks.
 
@@ -2007,11 +1811,6 @@ Python multithreading can be **slower** due to the **Global Interpreter Lock (GI
 - **Python does have real threads**, but the GIL prevents them from running in **parallel** for CPU-bound tasks.  
 - However, **JIT compilers like PyPy** or **tools like JAX, Numba, and Cython** can help bypass the GIL.  
 - Other languages like **C, C++, Rust, and Java** don’t have this issue.
-
-👉 **Key Takeaway**:  
-- If you need **parallel computation**, use **multiprocessing** or **NumPy (which is optimized in C)**.  
-- If you need **asynchronous tasks**, use **asyncio** or **threading**.  
-- If you need **true multi-threading**, consider **Cython, JAX, or using another language**.
 
 #### **3. Other problems of Python**
 
@@ -2038,53 +1837,21 @@ print(e._Example__private_var)  # ⚠️ Python name-mangles it, but it's still 
 [^21]: Web: https://www.geeksforgeeks.org/private-variables-python/
 ---
 
-##### **2. Performance Issues (Slow Execution) 🐢**  
-**Problem:** Python is much **slower** than C, C++, or Rust because it is **interpreted and dynamically typed**.
-
-- **Impact:** Bad for performance-critical applications like game engines or real-time systems.
-- **Workaround:** Use Cython, Numba, or PyPy for speed improvements.
-
----
-
-##### **3. High Memory Usage & Inefficient for Large-Scale Systems 🛑**  
+##### **2. High Memory Usage & Inefficient for Large-Scale Systems 🛑**  
 **Problem:** Python is memory-hungry due to its dynamic typing and garbage collection.
 
 - **Impact:** Not ideal for embedded systems, memory-constrained environments, or massive-scale applications.
-- **Workaround:** Use **structs** (`struct`[^21] module), **NumPy**, or **Cython** to reduce memory overhead.
+- **Workaround:** Use **structs** (`struct`[^22] module), **NumPy**, or **Cython** to reduce memory overhead.
 
-The `struct` module in Python is used for **handling binary data** by converting between **Python objects** (like integers, floats) and **C-style packed bytes**.  
-
-**Why use `struct`?**  
-- Saves **memory** (uses compact binary format instead of inefficient Python objects).  
-- Used in **low-level file formats**, **network communication**, and **interfacing with C programs**.  
-- Helps **read/write binary files** (e.g., `.wav`, `.bmp`, `.exe`).  
-
-#### **Example: Packing and Unpacking Data**  
-```python
-import struct
-
-# Pack data: Convert integers (1, 2, 3) into a binary format
-binary_data = struct.pack("iii", 1, 2, 3)  # "iii" means 3 integers
-print(binary_data)  # Output: b'\x01\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00'
-
-# Unpack data: Convert binary back to integers
-numbers = struct.unpack("iii", binary_data)
-print(numbers)  # Output: (1, 2, 3)
-```
 [^22]: Pydoc: https://docs.python.org/3/library/struct.html
 ---
 
-##### **4. Weak Security 🔓**  
+##### **3. Weak Security 🔓**  
 **Problem:** Python is **dynamically typed** and **interpreted**, making it more vulnerable to security risks.
 
-- **Common issues:**  
-  - **Injection attacks** (e.g., SQL injection, code injection)  
-  - **Poor memory control** (no explicit pointer management)  
-  - **Reverse engineering is easy** (Python code can be easily decompiled)
+- **Reverse engineering is easy** (Python code can be easily decompiled)
 
-- **Workaround:**  
-  - Use **compiled languages (C/C++/Rust)** for security-critical applications.  
-  - **Obfuscate code** using PyArmor or Cython.
+- Use **compiled languages (C/C++/Rust)** for security-critical applications.  
 
 ---
 
@@ -2108,17 +1875,9 @@ print(add_numbers(2, 3))   # ✅ Works
 print(add_numbers("2", "3"))  # ❌ No error! Returns "23" instead of 5
 ```
 - **Impact:** Bugs can sneak in because Python does **not** check types at runtime.
-- **Workaround:** Use **MyPy**[^24] for static type checking.
+- Use **MyPy**[^24] for static type checking.
 
 [^24]: Pydoc: https://mypy.readthedocs.io/en/stable/
-
----
-
-##### **7. Dependency Management is Messy 📦⚠️**  
-**Problem:** Conflicts between different Python libraries can break projects.
-
-- **Impact:** Installing packages globally (via `pip`) can cause conflicts.
-- **Workaround:** Use **virtual environments** (`venv`, `conda`).
 
 ---
 
@@ -2131,22 +1890,6 @@ PINN stands for **Physics-Informed Neural Network**. It is a type of neural netw
 #### **How It Works:**
 - The network is trained not just on data but also on constraints derived from physical laws.
 - Example: For a PDE like $\frac{\partial u}{\partial t} = \nabla^2 u$, the PINN minimizes a loss function that includes both data loss and physics loss.
-
-#### **Applications:**
-- Solving PDEs in fluid dynamics, electromagnetics, and quantum mechanics.
-- Modeling systems where data is scarce but physical laws are known.
-
-#### **Advantages:**
-- Combines data-driven and physics-based approaches.
-- Requires less data compared to purely data-driven models.
-
-#### **Example of Loss Function:**
-$$ \text{Loss} = \text{Data Loss} + \lambda \cdot \text{Physics Loss} $$
-Where $\lambda$ is a weighting parameter.
-
-#### **Why Use It?**
-- Traditional numerical methods (e.g., finite difference) can be computationally expensive for high-dimensional problems.
-- PINNs are efficient for solving complex systems governed by physical laws.
 
 [^25]: Wikipedia: https://en.wikipedia.org/wiki/Physics-informed_neural_networks
 Paper part 1: https://arxiv.org/abs/1711.10561
@@ -2282,4 +2025,5 @@ for epoch in range(epochs):
     if epoch % 100 == 0:
         print(f"Epoch {epoch}, Loss: {loss_value.item()}, Max Norm: {max_grad_norm.item()}, L2 Norm: {l2_grad_norm.item()}")
 ```
-
+---
+# Thank You!
