@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import time
 from src.boundary.function import u_ex, f
 from src.problem.poisson_problem import PoissonProblem
-import matplotlib as mpl 
+import matplotlib as mpl
 from src.tools.utils import get_logger, load_config
 
 config = load_config()
@@ -74,8 +74,9 @@ if __name__ == "__main__":
             f=f,
             u_ex=u_ex,
             grid_type="uniform",
-            solver_type="direct",
+            solver_type="direct",  # Direct solver for dense matrices
             boundary_condition_type="dirichlet",
+            boundary_condition='dirichlet',  # Specify boundary condition type
             use_sparse=False)
         data_dense = convergence_test(u_ex,
                                       poisson_solver_dense,
@@ -97,13 +98,13 @@ if __name__ == "__main__":
             grid_type="uniform",
             solver_type="direct",
             boundary_condition_type="dirichlet",
+            boundary_condition='dirichlet',  # Specify boundary condition type
             use_sparse=True)  # Enable sparse solver
         data_sparse = convergence_test(u_ex,
                                        poisson_solver_sparse,
                                        n + 1,
                                        use_sparse=True)
-        data_sparse[
-            'solver'] = 'direct_sparse'  # Changed from 'direct' to 'direct_sparse'
+        data_sparse['solver'] = 'direct_sparse'
         all_data_sparse.append(data_sparse)
 
         logging.info(f"Completed Sparse Solver for N={n}")
@@ -123,26 +124,22 @@ if __name__ == "__main__":
     for idx, data in enumerate(dense_data, 1):
         ax = plt.subplot(2, 2, idx, projection='3d')
         # Plot Numerical Solution
-        surf = ax.plot_surface(
-            data['x'],
-            data['y'],
-            data['U'],
-            rstride=1,
-            cstride=1,
-            cmap=plt.cm.viridis,
-            alpha=0.7,
-            label='Numerical Solution'
-        )
+        surf = ax.plot_surface(data['x'],
+                               data['y'],
+                               data['U'],
+                               rstride=1,
+                               cstride=1,
+                               cmap=plt.cm.viridis,
+                               alpha=0.7,
+                               label='Numerical Solution')
         # Compute exact solution on the same grid
         u_exact = u_ex(data['x'], data['y'])
         # Plot Exact Solution as a wireframe
-        exact_wire = ax.plot_wireframe(
-            data['x'],
-            data['y'],
-            u_exact,
-            color='red',
-            linewidth=1.5
-        )
+        exact_wire = ax.plot_wireframe(data['x'],
+                                       data['y'],
+                                       u_exact,
+                                       color='red',
+                                       linewidth=1.5)
         ax.set_xlabel('$x$')
         ax.set_ylabel('$y$')
         ax.set_zlabel('$u(x,y)$')
@@ -150,7 +147,7 @@ if __name__ == "__main__":
         # Create a custom legend with specific colors
         from matplotlib.patches import Patch
         viridis_color = mpl.cm.viridis(0.5)  # Middle color of viridis
-        exact_color = 'red'                   # Solid color for exact solution
+        exact_color = 'red'  # Solid color for exact solution
         legend_elements = [
             Patch(facecolor=viridis_color,
                   edgecolor=viridis_color,
@@ -161,8 +158,7 @@ if __name__ == "__main__":
         ]
         ax.legend(handles=legend_elements)
     plt.tight_layout()
-    plt.savefig(
-        'combined_dense_solutions.png')  # Save the dense solutions plot
+    plt.savefig('doc/combined_dense_solutions.png')
     plt.show()
 
     # Plot all Sparse Solutions and Exact Solution in one figure using enumeration for subplot indexing
@@ -170,26 +166,22 @@ if __name__ == "__main__":
     for idx, data in enumerate(sparse_data, 1):
         ax = plt.subplot(2, 2, idx, projection='3d')
         # Plot Numerical Solution
-        surf = ax.plot_surface(
-            data['x'],
-            data['y'],
-            data['U'],
-            rstride=1,
-            cstride=1,
-            cmap=plt.cm.viridis,
-            alpha=0.7,
-            label='Numerical Solution'
-        )
+        surf = ax.plot_surface(data['x'],
+                               data['y'],
+                               data['U'],
+                               rstride=1,
+                               cstride=1,
+                               cmap=plt.cm.viridis,
+                               alpha=0.7,
+                               label='Numerical Solution')
         # Compute exact solution on the same grid
         u_exact = u_ex(data['x'], data['y'])
         # Plot Exact Solution as a wireframe
-        exact_wire = ax.plot_wireframe(
-            data['x'],
-            data['y'],
-            u_exact,
-            color='red',
-            linewidth=1.5
-        )
+        exact_wire = ax.plot_wireframe(data['x'],
+                                       data['y'],
+                                       u_exact,
+                                       color='red',
+                                       linewidth=1.5)
         ax.set_xlabel('$x$')
         ax.set_ylabel('$y$')
         ax.set_zlabel('$u(x,y)$')
@@ -197,7 +189,7 @@ if __name__ == "__main__":
         # Create a custom legend with specific colors
         from matplotlib.patches import Patch
         viridis_color = mpl.cm.viridis(0.5)  # Middle color of viridis
-        exact_color = 'red'                  # Solid color for exact solution
+        exact_color = 'red'  # Solid color for exact solution
         legend_elements = [
             Patch(facecolor=viridis_color,
                   edgecolor=viridis_color,
@@ -208,8 +200,7 @@ if __name__ == "__main__":
         ]
         ax.legend(handles=legend_elements)
     plt.tight_layout()
-    plt.savefig(
-        'combined_sparse_solutions.png')  # Save the sparse solutions plot
+    plt.savefig('doc/combined_sparse_solutions.png')
     plt.show()
 
     # **Compare Computation Time for Dense and Sparse Solvers**
@@ -226,6 +217,5 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True, which="both", ls="--")
     plt.tight_layout()
-    plt.savefig(
-        'dense_vs_sparse_computation_time.png')  # Save the comparison plot
+    plt.savefig('doc/dense_vs_sparse_computation_time.png')
     plt.show()

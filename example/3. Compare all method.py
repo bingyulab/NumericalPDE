@@ -107,8 +107,7 @@ if __name__ == "__main__":
     ns = [10, 20, 40, 80]
     # Compare all solvers and store results in df_all_solvers
     solver_types_to_compare = [
-        "fst", "jacobi", "gauss_seidel", "sor", "lu", "cholesky", "low_rank",
-        "conjugate_gradient"
+        "jacobi", "gauss_seidel", "sor", "conjugate_gradient"
     ]
     df_all_solvers = compare_solvers(solver_types_to_compare, ns)
 

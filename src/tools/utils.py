@@ -47,7 +47,7 @@ def plot2D(X, Y, Z, title=""):
     
     
 def load_config():    
-    config_path = './configs/config.yaml'
+    config_path = ''
     if not os.path.exists(config_path):
         config_path = os.path.join(os.path.dirname(__file__), '../configs', 'config.yaml')
 

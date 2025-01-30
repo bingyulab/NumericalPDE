@@ -1,21 +1,24 @@
 from src.solver.base_solver import Solver
 import numpy as np
 import logging
-from src.tools.sparse_matrix import SparseMatrix
 from scipy.fftpack import dst, idst
 import scipy.sparse.linalg as splin
-import scipy.sparse
+import scipy.sparse as sp
 import scipy.linalg as lin
 
 
 class DirectSolver(Solver):
 
     def solve(self, A, b):
-        logging.info("DirectSolver: Solving system")        
-        if scipy.sparse.issparse(A):
+        logging.info("DirectSolver: Solving system.")        
+        if sp.issparse(A):
             # Use sparse solver
-            u_int = splin.spsolve(A, b)
+            logging.info("DirectSolver: Using sparse solver. A is sparse: %s", sp.issparse(A))
+            lu = splin.splu(A)
+            u_int = lu.solve(b)
+            self.iterations = lu.perm_r.shape[0]  # Example: using permutation size as iterations
         else:
+            logging.info("DirectSolver: Using dense solver.")
             u_int = lin.solve(A, b)
             # Direct solvers typically don't have iterations
             self.iterations = 0
@@ -26,8 +29,8 @@ class FastPoissonSolver(Solver):
 
     def solve(self, L, b):
         logging.info("FastPoissonSolver: Solving system")
-        if isinstance(L, SparseMatrix):
-            L = L.to_dense()
+        if sp.issparse(L):
+            L = L.toarray()
         N = int(np.sqrt(L.shape[0]))
         
         b = b.reshape((N, N))

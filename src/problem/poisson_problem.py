@@ -2,7 +2,6 @@ import numpy as np
 from src.solver.solver_factory import SolverFactory
 from src.grid.grid_factory import GridFactory
 from src.boundary.boundary_condition_factory import BoundaryConditionFactory
-from src.tools.sparse_matrix import SparseMatrix
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 import logging
@@ -37,7 +36,7 @@ class PoissonProblem:
             solver_type=solver_type,
             tol=float(solver_config.get('tolerance',
                                         1e-8)),  # Ensure tol is float
-            max_iter=solver_config.get('max_iterations', 1000),
+            max_iter=solver_config.get('max_iterations', 10000),
             **solver_kwargs)  # Pass additional arguments
 
         # Pass the boundary function 'g' (self.u_ex) to the factory
@@ -62,19 +61,20 @@ class PoissonProblem:
         ]
         offsets = [-1, 0, 1]
         
-        T = sp.diags(diagonals, offsets, shape=(nx, nx),
-                    format='csr') / (h * h)
+        T = sp.diags(diagonals, offsets, shape=(nx, nx)) / (h * h)
 
         # Identity matrix
-        I = sp.identity(ny, format='csr')
+        I = sp.identity(ny)
 
         # 2D Laplacian using Kronecker product
         A = sp.kron(I, T) + sp.kron(T, I)
         # Add alpha * I to the operator
-        A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1), format='csr')
+        A += self.alpha * sp.eye((self.Nx - 1) * (self.Ny - 1))
         logging.debug(f"A:{sp.isspmatrix(A)}")
         if self.use_sparse:
             A = sp.csr_matrix(A)
+        else:
+            A = A.toarray()
         return A
 
     def solve(self, mode='sequential'):
@@ -92,7 +92,7 @@ class PoissonProblem:
             u_int = self.solver.solve(A, b)
         elif mode == 'parallel':            
             if self.use_sparse:
-                A = SparseMatrix.from_dense(A)
+                A = A.toarray()
 
             with mp.Pool(mp.cpu_count()) as pool:
                 u_int = pool.apply(self.solver.solve, args=(A, b))
